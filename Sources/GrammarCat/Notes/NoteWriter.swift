@@ -20,10 +20,11 @@ enum NoteWriter {
         }
 
         var content = try String(contentsOf: url, encoding: .utf8)
-        if !content.isEmpty && !content.hasSuffix("\n") {
-            content += "\n"
+        // Drop trailing newlines so the entry lands on the next line exactly —
+        // no blank-line gap, and no doubling when the file already ends in \n\n.
+        while content.hasSuffix("\n") {
+            content.removeLast()
         }
-        // Blank line before the entry so consecutive entries stay separated.
         content += "\n" + entry + "\n"
 
         try content.write(to: url, atomically: true, encoding: .utf8)
