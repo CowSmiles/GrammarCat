@@ -37,20 +37,17 @@ final class FloatingButtonView: NSView {
 
     private func buildContextMenu() {
         let contextMenu = NSMenu()
-        let open = NSMenuItem(title: "Open GrammarCat",
-                              action: #selector(menuOpen), keyEquivalent: "")
-        open.target = self
-        let settings = NSMenuItem(title: "Settings…",
-                                  action: #selector(menuSettings), keyEquivalent: "")
-        settings.target = self
-        let quit = NSMenuItem(title: "Quit GrammarCat",
-                              action: #selector(menuQuit), keyEquivalent: "")
-        quit.target = self
-        contextMenu.addItem(open)
-        contextMenu.addItem(settings)
+        contextMenu.addItem(menuItem("Open GrammarCat", #selector(menuOpen)))
+        contextMenu.addItem(menuItem("Settings…", #selector(menuSettings)))
         contextMenu.addItem(.separator())
-        contextMenu.addItem(quit)
+        contextMenu.addItem(menuItem("Quit GrammarCat", #selector(menuQuit)))
         menu = contextMenu
+    }
+
+    private func menuItem(_ title: String, _ action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        return item
     }
 
     @objc private func menuOpen() { onClick?() }
@@ -101,11 +98,12 @@ final class FloatingButton: NSPanel {
     var onShowSettings: (() -> Void)?
 
     private static let positionKey = "FloatingButtonOrigin"
-    private let buttonView = FloatingButtonView(frame: NSRect(x: 0, y: 0, width: 52, height: 52))
+    private static let size = NSSize(width: 52, height: 52)
+    private let buttonView = FloatingButtonView(frame: NSRect(origin: .zero, size: FloatingButton.size))
 
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 52, height: 52),
+            contentRect: NSRect(origin: .zero, size: Self.size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false

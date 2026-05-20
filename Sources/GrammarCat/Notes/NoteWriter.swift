@@ -9,17 +9,19 @@ enum NoteWriter {
         guard !entry.isEmpty else { return }
 
         let url = DailyNotePath.url(for: date)
-        let fileManager = FileManager.default
 
-        if !fileManager.fileExists(atPath: url.path) {
-            try fileManager.createDirectory(
+        var content: String
+        if let existing = try? String(contentsOf: url, encoding: .utf8) {
+            content = existing
+        } else {
+            // No note for this day yet — start from a minimal one.
+            try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            try minimalNote(for: date).write(to: url, atomically: true, encoding: .utf8)
+            content = minimalNote(for: date)
         }
 
-        var content = try String(contentsOf: url, encoding: .utf8)
         // Drop trailing newlines so the entry lands on the next line exactly —
         // no blank-line gap, and no doubling when the file already ends in \n\n.
         while content.hasSuffix("\n") {

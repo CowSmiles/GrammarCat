@@ -6,7 +6,9 @@ import AppKit
 /// become key — the text view must be first responder of the active app so
 /// Grammarly Desktop attaches to it.
 final class PopupWindow: NSPanel, NSWindowDelegate {
-    private let editor = EditorView(frame: NSRect(x: 0, y: 0, width: 540, height: 300))
+    private static let contentSize = NSSize(width: 540, height: 300)
+
+    private let editor = EditorView(frame: NSRect(origin: .zero, size: PopupWindow.contentSize))
     private var didPosition = false
 
     /// Called with the editor's text when the user submits (⌘↩ or Send).
@@ -16,7 +18,7 @@ final class PopupWindow: NSPanel, NSWindowDelegate {
 
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 300),
+            contentRect: NSRect(origin: .zero, size: Self.contentSize),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false

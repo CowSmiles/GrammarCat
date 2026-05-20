@@ -87,24 +87,26 @@ final class HotkeyRecorderField: NSButton {
 
     // MARK: - Cocoa ⇄ Carbon conversion
 
+    /// Modifiers in canonical display order (⌃⌥⇧⌘), each paired with its
+    /// Carbon mask bit and symbol.
+    private static let modifierTable: [(flag: NSEvent.ModifierFlags, carbon: Int, symbol: String)] = [
+        (.control, controlKey, "⌃"),
+        (.option, optionKey, "⌥"),
+        (.shift, shiftKey, "⇧"),
+        (.command, cmdKey, "⌘"),
+    ]
+
     static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> Int {
-        var mask = 0
-        if flags.contains(.command) { mask |= cmdKey }
-        if flags.contains(.shift)   { mask |= shiftKey }
-        if flags.contains(.option)  { mask |= optionKey }
-        if flags.contains(.control) { mask |= controlKey }
-        return mask
+        modifierTable.reduce(0) { flags.contains($1.flag) ? $0 | $1.carbon : $0 }
     }
 
     static func displayString(keyCode: Int, modifiers: NSEvent.ModifierFlags,
                               event: NSEvent) -> String {
-        var result = ""
-        if modifiers.contains(.control) { result += "⌃" }
-        if modifiers.contains(.option)  { result += "⌥" }
-        if modifiers.contains(.shift)   { result += "⇧" }
-        if modifiers.contains(.command) { result += "⌘" }
-        result += keyName(keyCode: keyCode, event: event)
-        return result
+        let symbols = modifierTable
+            .filter { modifiers.contains($0.flag) }
+            .map(\.symbol)
+            .joined()
+        return symbols + keyName(keyCode: keyCode, event: event)
     }
 
     private static let specialKeys: [Int: String] = [

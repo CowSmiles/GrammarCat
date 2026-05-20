@@ -27,13 +27,18 @@ enum Settings {
             .appendingPathComponent("Documents/Notes/Daily/Journal").path
     }
 
+    /// The factory-default hotkey — ⌘⇧I.
+    private static let defaultHotKey = (code: kVK_ANSI_I,
+                                        modifiers: cmdKey | shiftKey,
+                                        display: "⌘⇧I")
+
     static func registerDefaults() {
         store.register(defaults: [
             Key.writeToNote: true,
             Key.noteBaseDir: defaultNoteBaseDirectory,
-            Key.hotKeyCode: kVK_ANSI_I,
-            Key.hotKeyModifiers: cmdKey | shiftKey,
-            Key.hotKeyDisplay: "⌘⇧I",
+            Key.hotKeyCode: defaultHotKey.code,
+            Key.hotKeyModifiers: defaultHotKey.modifiers,
+            Key.hotKeyDisplay: defaultHotKey.display,
             Key.autoPaste: true,
             Key.showFloatingButton: true,
         ])
@@ -60,7 +65,9 @@ enum Settings {
 
     static var hotKeyCode: Int { store.integer(forKey: Key.hotKeyCode) }
     static var hotKeyModifiers: Int { store.integer(forKey: Key.hotKeyModifiers) }
-    static var hotKeyDisplay: String { store.string(forKey: Key.hotKeyDisplay) ?? "⌘⇧I" }
+    static var hotKeyDisplay: String {
+        store.string(forKey: Key.hotKeyDisplay) ?? defaultHotKey.display
+    }
 
     static func setHotKey(code: Int, modifiers: Int, display: String) {
         store.set(code, forKey: Key.hotKeyCode)

@@ -29,7 +29,7 @@ cp "$ROOT/Resources/Info.plist" "$CONTENTS/Info.plist"
 plutil -lint "$CONTENTS/Info.plist"
 
 echo "==> codesign (ad-hoc)"
-codesign --force --deep --sign - "$APP_DIR"
+codesign --force --sign - "$APP_DIR"
 codesign --verify --verbose "$APP_DIR"
 
 if [[ "${1:-}" == "--install" ]]; then

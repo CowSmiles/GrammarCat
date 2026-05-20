@@ -12,11 +12,16 @@ enum DailyNotePath {
             .appendingPathComponent(string(from: date, format: "yyyy-MM-dd") + ".md")
     }
 
-    /// Formats `date` with a fixed, locale-independent formatter.
-    static func string(from date: Date, format: String) -> String {
+    /// One reusable, locale-independent formatter — `DateFormatter` is
+    /// expensive to allocate, and note writes happen on a single queue.
+    private static let formatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
+        return formatter
+    }()
+
+    static func string(from date: Date, format: String) -> String {
         formatter.dateFormat = format
         return formatter.string(from: date)
     }

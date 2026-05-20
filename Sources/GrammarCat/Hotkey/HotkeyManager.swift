@@ -16,6 +16,7 @@ final class HotkeyManager {
     private var hotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
     private var handlerInstalled = false
+    private var registeredChord: (Int, Int)?
 
     /// Installs the event handler (once) and registers the current chord.
     func register() {
@@ -23,27 +24,27 @@ final class HotkeyManager {
             installHandler()
             handlerInstalled = true
         }
-        registerHotKey()
+        reload()
     }
 
-    /// Re-registers the hotkey from the current `Settings` values.
+    /// Registers the chord from current `Settings`. No-ops when the chord is
+    /// unchanged, so it is safe to call on any settings change.
     func reload() {
+        let chord = (Settings.hotKeyCode, Settings.hotKeyModifiers)
+        if let registeredChord, registeredChord == chord { return }
+
         if let hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
         }
-        registerHotKey()
-    }
-
-    private func registerHotKey() {
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
-            UInt32(Settings.hotKeyCode),
-            UInt32(Settings.hotKeyModifiers),
+            UInt32(chord.0), UInt32(chord.1),
             hotKeyID, GetApplicationEventTarget(), 0, &ref
         )
         if status == noErr {
             hotKeyRef = ref
+            registeredChord = chord
         } else {
             NSLog("GrammarCat: hotkey registration failed (status \(status))")
         }

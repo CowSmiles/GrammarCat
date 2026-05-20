@@ -8,8 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var floatingButton: FloatingButton!
     private lazy var settingsWindow = SettingsWindow()
 
-    private var appliedHotKey: (Int, Int)?
-    private var appliedButtonVisible: Bool?
     private var didWarnAccessibility = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -49,19 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow.present()
     }
 
-    /// Re-applies settings — but only the parts that actually changed, so
-    /// toggling an unrelated setting doesn't tear down and re-register the
-    /// global hotkey. (Note writing and auto-paste are read at submit time.)
+    /// Re-applies settings that need an action. Both calls self-guard against
+    /// no-ops — `hotkey.reload()` skips an unchanged chord, `setVisible` is
+    /// idempotent. (Note writing and auto-paste are read at submit time.)
     @objc private func applySettings() {
-        let chord = (Settings.hotKeyCode, Settings.hotKeyModifiers)
-        if appliedHotKey == nil || appliedHotKey! != chord {
-            appliedHotKey = chord
-            hotkey.reload()
-        }
-        if appliedButtonVisible != Settings.showFloatingButton {
-            appliedButtonVisible = Settings.showFloatingButton
-            floatingButton.setVisible(Settings.showFloatingButton)
-        }
+        hotkey.reload()
+        floatingButton.setVisible(Settings.showFloatingButton)
     }
 
     // MARK: - Popup control

@@ -46,4 +46,8 @@ final class FocusTracker {
     private func isSelf(_ app: NSRunningApplication) -> Bool {
         app.processIdentifier == NSRunningApplication.current.processIdentifier
     }
+
+    deinit {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
 }

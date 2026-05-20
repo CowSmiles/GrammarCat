@@ -24,10 +24,12 @@ final class GrammarTextView: NSTextView {
     }
 }
 
-/// The popup's content view: the text editor plus a bottom bar (hint + Send).
-final class EditorView: NSView, TextEditing {
+/// The popup's content view: the text editor plus a bottom bar
+/// (hint + Clear + Send).
+final class EditorView: NSView {
     let textView: GrammarTextView
     private let scrollView = NSScrollView()
+    private let clearButton = NSButton()
     private let sendButton = NSButton()
 
     var onSubmit: (() -> Void)?
@@ -45,10 +47,9 @@ final class EditorView: NSView, TextEditing {
         fatalError("EditorView is created in code only")
     }
 
-    // MARK: - TextEditing
+    // MARK: - Text access
 
     func currentText() -> String { textView.string }
-    func setText(_ text: String) { textView.string = text }
     func clear() { textView.string = "" }
     func focusEditor() { window?.makeFirstResponder(textView) }
 
@@ -87,6 +88,12 @@ final class EditorView: NSView, TextEditing {
         hint.font = .systemFont(ofSize: 11)
         hint.textColor = .secondaryLabelColor
 
+        clearButton.translatesAutoresizingMaskIntoConstraints = false
+        clearButton.title = "Clear"
+        clearButton.bezelStyle = .rounded
+        clearButton.target = self
+        clearButton.action = #selector(clearTapped)
+
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         sendButton.title = "Send"
         sendButton.bezelStyle = .rounded
@@ -95,6 +102,7 @@ final class EditorView: NSView, TextEditing {
 
         addSubview(scrollView)
         addSubview(hint)
+        addSubview(clearButton)
         addSubview(sendButton)
 
         NSLayoutConstraint.activate([
@@ -105,6 +113,9 @@ final class EditorView: NSView, TextEditing {
             sendButton.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
             sendButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             sendButton.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+
+            clearButton.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor),
+            clearButton.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -8),
 
             hint.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             hint.centerYAnchor.constraint(equalTo: sendButton.centerYAnchor),
@@ -118,5 +129,10 @@ final class EditorView: NSView, TextEditing {
 
     @objc private func sendTapped() {
         onSubmit?()
+    }
+
+    @objc private func clearTapped() {
+        clear()
+        focusEditor()
     }
 }
