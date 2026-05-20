@@ -8,12 +8,17 @@ import Carbon
 final class GrammarTextView: NSTextView {
     var onSubmit: (() -> Void)?
     var onCancel: (() -> Void)?
+    weak var completion: CompletionController?
 
     override func keyDown(with event: NSEvent) {
         let isReturn = event.keyCode == UInt16(kVK_Return)
             || event.keyCode == UInt16(kVK_ANSI_KeypadEnter)
         if isReturn && event.modifierFlags.contains(.command) {
             onSubmit?()
+            return
+        }
+        // An open completion list consumes navigation keys before the editor.
+        if completion?.handleKeyDown(event) == true {
             return
         }
         super.keyDown(with: event)
@@ -26,21 +31,25 @@ final class GrammarTextView: NSTextView {
 
 /// The popup's content view: the text editor plus a bottom bar
 /// (hint + Clear + Send).
-final class EditorView: NSView {
+final class EditorView: NSView, NSTextViewDelegate {
     let textView: GrammarTextView
     private let scrollView = NSScrollView()
     private let clearButton = NSButton()
     private let sendButton = NSButton()
+    private let completion: CompletionController
 
     var onSubmit: (() -> Void)?
     var onCancel: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         textView = GrammarTextView(frame: NSRect(x: 0, y: 0, width: 480, height: 240))
+        completion = CompletionController(textView: textView)
         super.init(frame: frameRect)
         buildTextView()
         buildLayout()
         wireKeys()
+        textView.completion = completion
+        textView.delegate = self
     }
 
     required init?(coder: NSCoder) {
@@ -50,8 +59,12 @@ final class EditorView: NSView {
     // MARK: - Text access
 
     func currentText() -> String { textView.string }
-    func clear() { textView.string = "" }
     func focusEditor() { window?.makeFirstResponder(textView) }
+
+    func clear() {
+        textView.string = ""
+        completion.dismiss()
+    }
 
     // MARK: - Setup
 
@@ -134,5 +147,15 @@ final class EditorView: NSView {
     @objc private func clearTapped() {
         clear()
         focusEditor()
+    }
+
+    // MARK: - NSTextViewDelegate
+
+    func textDidChange(_ notification: Notification) {
+        completion.textOrSelectionChanged()
+    }
+
+    func textViewDidChangeSelection(_ notification: Notification) {
+        completion.textOrSelectionChanged()
     }
 }
