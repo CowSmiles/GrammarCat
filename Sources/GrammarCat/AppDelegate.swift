@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var appliedHotKey: (Int, Int)?
     private var appliedButtonVisible: Bool?
+    private var didWarnAccessibility = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Settings.registerDefaults()
@@ -105,20 +106,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        if Settings.autoPaste {
-            if AccessibilityGate.isTrusted {
-                // Paster re-activates the previous app, then synthesises ⌘V.
-                Paster.paste(trimmed, into: focusTracker.previousApp)
-            } else {
-                focusTracker.restore()
-                AccessibilityGate.ensure(prompt: true)
-            }
+        if Settings.autoPaste && AccessibilityGate.isTrusted {
+            // Paster re-activates the previous app, then synthesises ⌘V.
+            Paster.paste(trimmed, into: focusTracker.previousApp)
         } else {
-            // Auto-paste off: just leave it on the clipboard for a manual ⌘V.
+            // Auto-paste off, or no Accessibility permission: leave the text
+            // on the clipboard so a manual ⌘V still works — never lose it.
             Paster.copyToClipboard(trimmed)
             focusTracker.restore()
+            if Settings.autoPaste {
+                warnAccessibilityIfNeeded()
+            }
         }
 
         popup.clearEditor()
+    }
+
+    /// Auto-paste is on but Accessibility is denied — tell the user once per
+    /// launch, since otherwise the paste just fails silently.
+    private func warnAccessibilityIfNeeded() {
+        guard !didWarnAccessibility else { return }
+        didWarnAccessibility = true
+
+        let alert = NSAlert()
+        alert.messageText = "GrammarCat can't auto-paste yet"
+        alert.informativeText = """
+        Auto-paste needs Accessibility permission. Your text is on the \
+        clipboard — press ⌘V to paste it — and was saved to your note.
+
+        Enable GrammarCat under System Settings → Privacy & Security → \
+        Accessibility, then relaunch it.
+        """
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Later")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            AccessibilityGate.openAccessibilitySettings()
+        }
     }
 }

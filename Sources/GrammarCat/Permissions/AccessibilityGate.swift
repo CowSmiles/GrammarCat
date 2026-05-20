@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 
 /// Thin wrapper over the macOS Accessibility-trust API.
@@ -17,5 +18,13 @@ enum AccessibilityGate {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let options = [key: prompt] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
+    }
+
+    /// Opens System Settings at Privacy & Security → Accessibility.
+    static func openAccessibilitySettings() {
+        let path = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        if let url = URL(string: path) {
+            NSWorkspace.shared.open(url)
+        }
     }
 }
