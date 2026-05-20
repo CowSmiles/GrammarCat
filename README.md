@@ -18,12 +18,13 @@ GrammarCat itself does **no** grammar correction — Grammarly does all of it.
 
 ## Usage
 
-- **Open the popup:** press the global hotkey (`⌘⇧I`) or click the
+- **Open the popup:** press the global hotkey (`⌘⇧I` by default) or click the
   floating button (drag it anywhere on screen).
 - **Edit:** type or paste; Grammarly corrects inline.
 - **Submit:** `⌘↩` — popup hides, text is pasted into the previous app and
   logged to today's note.
 - **Cancel:** `esc` — hides the popup, keeps your draft.
+- **Settings / Quit:** right-click the floating button.
 
 ## Build
 
@@ -44,9 +45,20 @@ Accessibility, then relaunch. Note logging works even without it.
 The app is ad-hoc signed, so every rebuild changes its signature and macOS
 invalidates the Accessibility grant — re-enable GrammarCat after each rebuild.
 
-## Configuration
+## Settings
 
-Defaults live as constants in the source:
+Right-click the floating button → **Settings…** (or press `⌘,` while a
+GrammarCat window is focused — useful if the floating button is hidden).
+The Settings window configures:
 
-- Hotkey — `HotkeyManager.swift`
-- Daily-note base path — `DailyNotePath.swift`
+- **Append submitted text to my daily note** — turn note logging on/off.
+- **Daily-note folder** — where notes live; files go to
+  `<folder>/YYYY/YYYY-MM-DD.md`.
+- **Global hotkey** — click the field, then press a new chord.
+- **Auto-paste into the previous app** — when off, corrected text only goes
+  to the clipboard for a manual `⌘V` (no Accessibility permission needed).
+- **Show the floating button** — hide it to rely on the hotkey alone.
+- **Launch GrammarCat at login** — works most reliably when the app lives in
+  `/Applications` (see Build → `--install`).
+
+Settings are stored in `UserDefaults` and apply immediately.

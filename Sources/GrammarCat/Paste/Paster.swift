@@ -7,12 +7,17 @@ import CoreGraphics
 /// The corrected text is left on the clipboard afterwards (no restore) — a
 /// restore would race with the paste and risk pasting stale content.
 enum Paster {
-    /// Copies `text` to the pasteboard, re-activates `app`, then synthesises ⌘V.
-    /// Requires Accessibility permission for the synthetic key events.
-    static func paste(_ text: String, into app: NSRunningApplication?) {
+    /// Places `text` on the general pasteboard, replacing its contents.
+    static func copyToClipboard(_ text: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+    }
+
+    /// Copies `text` to the pasteboard, re-activates `app`, then synthesises ⌘V.
+    /// Requires Accessibility permission for the synthetic key events.
+    static func paste(_ text: String, into app: NSRunningApplication?) {
+        copyToClipboard(text)
 
         if let app, !app.isTerminated {
             _ = app.activate(options: [])

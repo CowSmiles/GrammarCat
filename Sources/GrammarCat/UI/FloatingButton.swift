@@ -5,6 +5,7 @@ import AppKit
 final class FloatingButtonView: NSView {
     var onClick: (() -> Void)?
     var onDragEnded: (() -> Void)?
+    var onShowSettings: (() -> Void)?
 
     private var mouseDownLocation: NSPoint = .zero
     private var windowOriginAtMouseDown: NSPoint = .zero
@@ -26,11 +27,35 @@ final class FloatingButtonView: NSView {
             icon.centerXAnchor.constraint(equalTo: centerXAnchor),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
+
+        buildContextMenu()
     }
 
     required init?(coder: NSCoder) {
         fatalError("FloatingButtonView is created in code only")
     }
+
+    private func buildContextMenu() {
+        let contextMenu = NSMenu()
+        let open = NSMenuItem(title: "Open GrammarCat",
+                              action: #selector(menuOpen), keyEquivalent: "")
+        open.target = self
+        let settings = NSMenuItem(title: "Settings…",
+                                  action: #selector(menuSettings), keyEquivalent: "")
+        settings.target = self
+        let quit = NSMenuItem(title: "Quit GrammarCat",
+                              action: #selector(menuQuit), keyEquivalent: "")
+        quit.target = self
+        contextMenu.addItem(open)
+        contextMenu.addItem(settings)
+        contextMenu.addItem(.separator())
+        contextMenu.addItem(quit)
+        menu = contextMenu
+    }
+
+    @objc private func menuOpen() { onClick?() }
+    @objc private func menuSettings() { onShowSettings?() }
+    @objc private func menuQuit() { NSApp.terminate(nil) }
 
     override var wantsUpdateLayer: Bool { true }
 
@@ -73,6 +98,7 @@ final class FloatingButtonView: NSView {
 /// An always-on-top, non-activating, draggable button shown over every app.
 final class FloatingButton: NSPanel {
     var onClick: (() -> Void)?
+    var onShowSettings: (() -> Void)?
 
     private static let positionKey = "FloatingButtonOrigin"
     private let buttonView = FloatingButtonView(frame: NSRect(x: 0, y: 0, width: 52, height: 52))
@@ -95,6 +121,7 @@ final class FloatingButton: NSPanel {
         contentView = buttonView
 
         buttonView.onClick = { [weak self] in self?.onClick?() }
+        buttonView.onShowSettings = { [weak self] in self?.onShowSettings?() }
         buttonView.onDragEnded = { [weak self] in self?.savePosition() }
 
         restorePosition()
@@ -102,8 +129,12 @@ final class FloatingButton: NSPanel {
 
     override var canBecomeKey: Bool { false }
 
-    func show() {
-        orderFrontRegardless()
+    func setVisible(_ visible: Bool) {
+        if visible {
+            orderFrontRegardless()
+        } else {
+            orderOut(nil)
+        }
     }
 
     private func restorePosition() {

@@ -6,14 +6,23 @@ import AppKit
 /// shortcuts (⌘C/⌘V/⌘X/⌘A/⌘Z) are dispatched as menu key equivalents — so
 /// without an Edit menu, *pasting into our own text view would not work*.
 enum AppMenu {
-    static func install() {
+    /// `settingsTarget` receives `openSettings(_:)` when ⌘, is pressed — this
+    /// is the always-available way to reach Settings even if the floating
+    /// button (its other entry point) is hidden.
+    static func install(settingsTarget: AnyObject?) {
         let mainMenu = NSMenu()
 
-        // App menu — only needs Quit.
         let appItem = NSMenuItem()
         mainMenu.addItem(appItem)
         let appMenu = NSMenu()
         appItem.submenu = appMenu
+        let settingsItem = appMenu.addItem(
+            withTitle: "Settings…",
+            action: #selector(AppDelegate.openSettings(_:)),
+            keyEquivalent: ","
+        )
+        settingsItem.target = settingsTarget
+        appMenu.addItem(.separator())
         appMenu.addItem(
             withTitle: "Quit GrammarCat",
             action: #selector(NSApplication.terminate(_:)),

@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 
 /// A native `NSTextView` that reports ⌘↩ (submit) and `esc` (cancel).
 ///
@@ -9,7 +10,8 @@ final class GrammarTextView: NSTextView {
     var onCancel: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
-        let isReturn = event.keyCode == 36 || event.keyCode == 76 // Return / keypad Enter
+        let isReturn = event.keyCode == UInt16(kVK_Return)
+            || event.keyCode == UInt16(kVK_ANSI_KeypadEnter)
         if isReturn && event.modifierFlags.contains(.command) {
             onSubmit?()
             return

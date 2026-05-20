@@ -6,24 +6,41 @@ import Carbon
 /// Carbon hotkeys are used (rather than `NSEvent` global monitors) because
 /// they need no Accessibility permission, fire reliably while GrammarCat is
 /// in the background, and consume the chord so it doesn't leak to other apps.
+///
+/// The chord itself is read live from `Settings`; call `reload()` after the
+/// user changes it.
 final class HotkeyManager {
     var onTrigger: (() -> Void)?
 
-    // Default chord: ⌘⇧I. Rebind by editing keyCode / modifiers here.
-    private let keyCode = UInt32(kVK_ANSI_I)
-    private let modifiers = UInt32(cmdKey | shiftKey)
     private let hotKeyID = EventHotKeyID(signature: 0x47434154 /* 'GCAT' */, id: 1)
-
     private var hotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
+    private var handlerInstalled = false
 
+    /// Installs the event handler (once) and registers the current chord.
     func register() {
-        installHandler()
+        if !handlerInstalled {
+            installHandler()
+            handlerInstalled = true
+        }
+        registerHotKey()
+    }
 
+    /// Re-registers the hotkey from the current `Settings` values.
+    func reload() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
+        registerHotKey()
+    }
+
+    private func registerHotKey() {
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
-            keyCode, modifiers, hotKeyID,
-            GetApplicationEventTarget(), 0, &ref
+            UInt32(Settings.hotKeyCode),
+            UInt32(Settings.hotKeyModifiers),
+            hotKeyID, GetApplicationEventTarget(), 0, &ref
         )
         if status == noErr {
             hotKeyRef = ref
