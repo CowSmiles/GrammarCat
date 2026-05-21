@@ -1,16 +1,34 @@
 import Foundation
 
 /// One file/folder candidate for `@`-mention completion.
-struct PathCandidate {
-    let displayName: String   // entry name, with a trailing "/" for directories
-    let absolutePath: String  // fully resolved absolute path
+struct PathCandidate: Equatable {
+    /// Entry name (flat search) or path relative to the search root (recursive
+    /// search); a trailing "/" marks a directory.
+    let displayName: String
+    let absolutePath: String
     let isDirectory: Bool
 }
 
 /// The `@`-token currently under the caret.
 struct ATokenContext {
-    let tokenRange: NSRange   // UTF-16 range of "@…" in the text view's string
-    let query: String         // the text after "@", up to the caret
+    let tokenRange: NSRange
+    let query: String
+}
+
+/// One entry from a recursive project walk — cached once, then re-filtered in
+/// memory on each keystroke. `lowerName` and `depth` are precomputed by the
+/// walk so the re-filter does no per-entry string work.
+struct RecursiveEntry {
+    let relativePath: String
+    let isDirectory: Bool
+    let lowerName: String   // lowercased last path component
+    let depth: Int          // count of "/" in relativePath
+}
+
+/// How a query should be searched, decided from the query string alone.
+enum SearchMode {
+    case flat(directory: URL, partial: String)
+    case recursive(root: URL, nameTerm: String)
 }
 
 /// Pure logic for `@`-mention path completion: token detection, path
@@ -18,29 +36,34 @@ struct ATokenContext {
 enum PathCompletionEngine {
     /// Base for queries that are neither absolute (`/…`) nor home (`~/…`).
     static let baseDirectory = "~/code"
+    /// `baseDirectory` with `~` expanded — resolved once.
+    private static let expandedBase = NSString(string: baseDirectory).expandingTildeInPath
 
-    /// Cap on candidates returned for one query (the list scrolls anyway).
     private static let maxCandidates = 200
-
+    private static let maxRecursiveEntries = 20_000
     private static let atSign = ("@" as NSString).character(at: 0)
+
+    /// Non-hidden directories never worth walking into. Hidden (dot)
+    /// directories are excluded separately via `.skipsHiddenFiles`.
+    static let ignoredDirectoryNames: Set<String> = [
+        "node_modules", "build", "dist", "target", "DerivedData",
+        "Pods", "__pycache__", "venv", "vendor",
+    ]
 
     // MARK: - Token detection
 
-    /// Finds an active `@`-token ending exactly at `caret` (a UTF-16 offset),
-    /// or nil if the caret is not inside one.
+    /// Finds an active `@`-token ending exactly at `caret` (a UTF-16 offset).
     static func activeToken(in text: String, caret: Int) -> ATokenContext? {
         let ns = text as NSString
         guard caret >= 0, caret <= ns.length else { return nil }
 
-        // Walk back from the caret over non-whitespace characters.
         var start = caret
         while start > 0, !isBoundary(ns.character(at: start - 1)) {
             start -= 1
         }
-        // The run must begin with '@'…
         guard start < caret, ns.character(at: start) == atSign else { return nil }
-        // …and that '@' must be at text start or right after whitespace
-        // (so email addresses like `foo@bar` don't trigger completion).
+        // The '@' must be at text start or right after whitespace (so email
+        // addresses like `foo@bar` don't trigger completion).
         if start > 0, !isBoundary(ns.character(at: start - 1)) { return nil }
 
         return ATokenContext(
@@ -64,10 +87,10 @@ enum PathCompletionEngine {
             base = "/"
             pathPart = String(query.dropFirst())
         } else if query.hasPrefix("~/") || query == "~" {
-            base = NSString(string: "~").expandingTildeInPath
+            base = NSHomeDirectory()
             pathPart = query.hasPrefix("~/") ? String(query.dropFirst(2)) : ""
         } else {
-            base = NSString(string: baseDirectory).expandingTildeInPath
+            base = expandedBase
             pathPart = query
         }
 
@@ -80,11 +103,38 @@ enum PathCompletionEngine {
         return (directory.standardizedFileURL, partial)
     }
 
-    // MARK: - Matching
-
-    /// Files and folders matching `query`, directories first.
-    static func candidates(for query: String) -> [PathCandidate] {
+    /// Decides flat vs recursive search. Recursive only for a `~/code`-relative
+    /// query that names a subdirectory (contains a `/`) and stays inside
+    /// `~/code` — recursing an arbitrary root would be unbounded.
+    static func searchMode(for query: String) -> SearchMode {
         let (directory, partial) = resolve(query: query)
+        let isRelativeToBase = !query.hasPrefix("/") && !query.hasPrefix("~")
+        let withinBase = directory.path == expandedBase
+            || directory.path.hasPrefix(expandedBase + "/")
+
+        if isRelativeToBase, query.contains("/"), withinBase {
+            return .recursive(root: directory, nameTerm: partial)
+        }
+        return .flat(directory: directory, partial: partial)
+    }
+
+    // MARK: - Candidate construction
+
+    /// Builds a candidate, applying the trailing-"/" display convention for
+    /// directories. `displayBase` is the entry name (flat search) or the
+    /// root-relative path (recursive search).
+    private static func makeCandidate(displayBase: String,
+                                      absolutePath: String,
+                                      isDirectory: Bool) -> PathCandidate {
+        PathCandidate(
+            displayName: isDirectory ? displayBase + "/" : displayBase,
+            absolutePath: absolutePath,
+            isDirectory: isDirectory)
+    }
+
+    // MARK: - Flat matching (immediate children)
+
+    static func flatCandidates(directory: URL, partial: String) -> [PathCandidate] {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -96,22 +146,102 @@ enum PathCompletionEngine {
         let wantsHidden = partial.hasPrefix(".")
         let lowerPartial = partial.lowercased()
 
-        let matched = entries.compactMap { url -> PathCandidate? in
+        return entries.compactMap { url -> PathCandidate? in
             let name = url.lastPathComponent
             if name.hasPrefix(".") && !wantsHidden { return nil }
             if !lowerPartial.isEmpty && !name.lowercased().hasPrefix(lowerPartial) { return nil }
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            return PathCandidate(
-                displayName: isDir ? name + "/" : name,
-                absolutePath: url.standardizedFileURL.path,
-                isDirectory: isDir
-            )
+            return makeCandidate(displayBase: name,
+                                 absolutePath: url.standardizedFileURL.path,
+                                 isDirectory: isDir)
         }.sorted { lhs, rhs in
             if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
             return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
         }
+    }
 
-        return Array(matched.prefix(maxCandidates))
+    // MARK: - Recursive walk + ranking
+
+    /// Walks `root` once, pruning hidden and known-junk directories. Returns
+    /// every surviving entry (NOT name-filtered) so the result can be cached.
+    /// Polls `isCancelled` periodically and stops early when it returns true.
+    static func recursiveWalk(root: URL, isCancelled: () -> Bool) -> [RecursiveEntry] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles],
+            errorHandler: { _, _ in true }
+        ) else {
+            return []
+        }
+
+        let rootPath = root.standardizedFileURL.path
+        var entries: [RecursiveEntry] = []
+        var visited = 0
+
+        for case let url as URL in enumerator {
+            visited += 1
+            if visited & 0xFF == 0, isCancelled() { break }
+
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            if isDir, ignoredDirectoryNames.contains(url.lastPathComponent) {
+                enumerator.skipDescendants()
+                continue
+            }
+            // The enumerator started from a standardized root, so `url.path`
+            // is already normalized — no need to re-standardize per entry.
+            let relative = relativePath(of: url.path, under: rootPath)
+            entries.append(RecursiveEntry(
+                relativePath: relative,
+                isDirectory: isDir,
+                lowerName: (relative as NSString).lastPathComponent.lowercased(),
+                depth: relative.reduce(0) { $1 == "/" ? $0 + 1 : $0 }
+            ))
+            if entries.count >= maxRecursiveEntries { break }
+        }
+        return entries
+    }
+
+    private static func relativePath(of absolute: String, under root: String) -> String {
+        let prefix = root + "/"
+        return absolute.hasPrefix(prefix) ? String(absolute.dropFirst(prefix.count)) : absolute
+    }
+
+    /// Filters and ranks cached entries by `nameTerm` (matched against each
+    /// entry's last path component). Pure and synchronous — no I/O, and no
+    /// per-entry string work, since `lowerName`/`depth` were precomputed by the
+    /// walk. Tiers: exact → prefix → substring; within a tier, shallower →
+    /// directories first → path.
+    static func rankedCandidates(from entries: [RecursiveEntry],
+                                 nameTerm: String,
+                                 root: URL) -> [PathCandidate] {
+        let term = nameTerm.lowercased()
+
+        let scored = entries.compactMap { entry -> (entry: RecursiveEntry, tier: Int)? in
+            let tier: Int
+            if term.isEmpty || entry.lowerName == term {
+                tier = 0
+            } else if entry.lowerName.hasPrefix(term) {
+                tier = 1
+            } else if entry.lowerName.contains(term) {
+                tier = 2
+            } else {
+                return nil
+            }
+            return (entry, tier)
+        }.sorted { lhs, rhs in
+            if lhs.tier != rhs.tier { return lhs.tier < rhs.tier }
+            if lhs.entry.depth != rhs.entry.depth { return lhs.entry.depth < rhs.entry.depth }
+            if lhs.entry.isDirectory != rhs.entry.isDirectory { return lhs.entry.isDirectory }
+            return lhs.entry.relativePath < rhs.entry.relativePath
+        }
+
+        let rootPath = root.standardizedFileURL.path
+        return scored.prefix(maxCandidates).map { item in
+            makeCandidate(displayBase: item.entry.relativePath,
+                          absolutePath: rootPath + "/" + item.entry.relativePath,
+                          isDirectory: item.entry.isDirectory)
+        }
     }
 
     // MARK: - Acceptance
