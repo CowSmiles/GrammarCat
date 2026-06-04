@@ -21,10 +21,10 @@ enum Settings {
         static let showFloatingButton = "showFloatingButton"
     }
 
-    /// Default daily-note folder: `~/Documents/Notes/Daily/Journal`.
+    /// Default daily-note folder: `~/code/Notes/Daily/Journal`.
     static var defaultNoteBaseDirectory: String {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Documents/Notes/Daily/Journal").path
+            .appendingPathComponent("code/Notes/Daily/Journal").path
     }
 
     /// The factory-default hotkey — ⌘⇧I.

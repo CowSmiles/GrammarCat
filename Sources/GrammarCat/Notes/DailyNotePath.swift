@@ -3,7 +3,7 @@ import Foundation
 /// Resolves the Obsidian daily-note file for a given date.
 ///
 /// Layout: `<base folder>/<YYYY>/<YYYY-MM-DD>.md`, where the base folder is
-/// configurable in Settings (default `~/Documents/Notes/Daily/Journal`).
+/// configurable in Settings (default `~/code/Notes/Daily/Journal`).
 enum DailyNotePath {
     static func url(for date: Date = Date()) -> URL {
         let base = URL(fileURLWithPath: Settings.noteBaseDirectory, isDirectory: true)
